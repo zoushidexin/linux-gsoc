@@ -86,6 +86,7 @@ enum pageflags {
 	PG_private,		/* If pagecache, has fs-private data */
 	PG_private_2,		/* If pagecache, has fs aux data */
 	PG_writeback,		/* Page is under writeback */
+	PG_dedup,		/* Page is deduplicated file data */
 #ifdef CONFIG_PAGEFLAGS_EXTENDED
 	PG_head,		/* A head page */
 	PG_tail,		/* A tail page */
@@ -208,6 +209,7 @@ PAGEFLAG(Pinned, pinned) TESTSCFLAG(Pinned, pinned)	/* Xen */
 PAGEFLAG(SavePinned, savepinned);			/* Xen */
 PAGEFLAG(Reserved, reserved) __CLEARPAGEFLAG(Reserved, reserved)
 PAGEFLAG(SwapBacked, swapbacked) __CLEARPAGEFLAG(SwapBacked, swapbacked)
+PAGEFLAG(Dedup, dedup)
 
 __PAGEFLAG(SlobFree, slob_free)
 

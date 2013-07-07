@@ -33,6 +33,7 @@
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
+#include <linux/dedup.h>
 #include "internal.h"
 
 #define CREATE_TRACE_POINTS
@@ -754,6 +755,8 @@ repeat:
 		lock_page(page);
 		/* Has the page been truncated? */
 		if (unlikely(page->mapping != mapping)) {
+			if (unlikely(PageDedup(page)))
+				return page;
 			unlock_page(page);
 			page_cache_release(page);
 			goto repeat;
@@ -1137,6 +1140,8 @@ find_page:
 					ra, filp, page,
 					index, last_index - index);
 		}
+		if (unlikely(PageDedup(page)))
+			goto page_ok;
 		if (!PageUptodate(page)) {
 			if (inode->i_blkbits == PAGE_CACHE_SHIFT ||
 					!mapping->a_ops->is_partially_uptodate)
@@ -2278,8 +2283,13 @@ struct page *grab_cache_page_write_begin(struct address_space *mapping,
 		gfp_notmask = __GFP_FS;
 repeat:
 	page = find_lock_page(mapping, index);
-	if (page)
+	if (page) {
+		if (unlikely(PageDedup(page))) {
+			if (dedup_do_pagecache_cow(mapping, index, &page, gfp_mask & ~gfp_notmask))
+				return NULL;
+		}
 		goto found;
+	}
 
 	page = __page_cache_alloc(gfp_mask & ~gfp_notmask);
 	if (!page)

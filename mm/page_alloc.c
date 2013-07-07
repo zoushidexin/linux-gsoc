@@ -6322,6 +6322,7 @@ static const struct trace_print_flags pageflag_names[] = {
 	{1UL << PG_private,		"private"	},
 	{1UL << PG_private_2,		"private_2"	},
 	{1UL << PG_writeback,		"writeback"	},
+	{1UL << PG_dedup,		"dedup"		},
 #ifdef CONFIG_PAGEFLAGS_EXTENDED
 	{1UL << PG_head,		"head"		},
 	{1UL << PG_tail,		"tail"		},
