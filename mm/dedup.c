@@ -104,6 +104,35 @@ static int replace_pagecache_dedup_page(struct page *dedup, struct address_space
 	return error;
 }
 
+/* dedup_truncate_page - Truncate a dedup page
+ * @page:	Page to be truncated
+ * @mapping:	Mapping in which to truncate
+ * @index:	Index to truncate
+ *
+ * Truncate a dedup page. I'm not ignoring partial-page truncations, I'm just pretending
+ * they don't exist...
+ */
+void dedup_truncate_page(struct page *page, struct address_space *mapping, pgoff_t index, int wait_on_lock)
+{
+	if (!wait_on_lock) {
+		if (!trylock_page(page))
+			return;
+	} else {
+		lock_page(page);
+	}
+
+	if (page_mapped(page)) {
+		unmap_mapping_range(mapping,
+				   (loff_t)index << PAGE_CACHE_SHIFT,
+				   PAGE_CACHE_SIZE, 0);
+	}
+
+	spin_lock_irq(&mapping->tree_lock);
+	dedup_delete_from_page_cache(mapping, index, page);
+	spin_unlock_irq(&mapping->tree_lock);
+	unlock_page(page);
+}
+
 /* dedup_replace_in_pagecache - Replace a duplicate page with a dedup page.
  * @page:	Page to be replaced
  * @type:	Only DEDUP_SPARSE is currently supported
@@ -138,7 +167,7 @@ int dedup_replace_in_pagecache(struct page *page, int type)
  * @page:	Pointer to pointer to page to be replaced, in the calling function
  *
  * This function takes a dedup'd page, copies its data to a fresh page, and replaces
- * the dedup'd page in the radix tree.
+ * the dedup'd page in the radix tree. It is assumed the dedup page is locked.
  */
 int dedup_do_pagecache_cow(struct address_space *mapping, pgoff_t offset, struct page **page, gfp_t gfp_mask)
 {

@@ -23,5 +23,6 @@
 
 int dedup_replace_in_pagecache(struct page *page, int type);
 int dedup_do_pagecache_cow(struct address_space *mapping, pgoff_t offset, struct page **page, gfp_t gfp_mask);
+void dedup_truncate_page(struct page *page, struct address_space *mapping, pgoff_t index, int wait_on_lock);
 
 #endif /* _LINUX_DEDUP_H */

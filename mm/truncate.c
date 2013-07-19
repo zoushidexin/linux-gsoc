@@ -20,6 +20,7 @@
 #include <linux/buffer_head.h>	/* grr. try_to_release_page,
 				   do_invalidatepage */
 #include <linux/cleancache.h>
+#include <linux/dedup.h>
 #include "internal.h"
 
 
@@ -244,6 +245,12 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
+			/* If it's a dedup page, just get rid of it */
+			if (unlikely(PageDedup(page))) {
+				dedup_truncate_page(page, mapping, pvec.indexes[i], 0);
+				continue;
+			}
+
 			/* We rely upon deletion not changing page->index */
 			index = page->index;
 			if (index >= end)
@@ -322,6 +329,12 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
+			/* If it's a dedup page, just get rid of it */
+			if (unlikely(PageDedup(page))) {
+				dedup_truncate_page(page, mapping, pvec.indexes[i], 1);
+				continue;
+			}
+
 			/* We rely upon deletion not changing page->index */
 			index = page->index;
 			if (index >= end)
@@ -395,6 +408,12 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 		mem_cgroup_uncharge_start();
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
+
+			/* If it's a dedup page, just get rid of it */
+			if (unlikely(PageDedup(page))) {
+				dedup_truncate_page(page, mapping, pvec.indexes[i], 0);
+				continue;
+			}
 
 			/* We rely upon deletion not changing page->index */
 			index = page->index;
@@ -496,6 +515,12 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 		mem_cgroup_uncharge_start();
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
+
+			/* If it's a dedup page, just get rid of it */
+			if (unlikely(PageDedup(page))) {
+				dedup_truncate_page(page, mapping, pvec.indexes[i], 1);
+				continue;
+			}
 
 			/* We rely upon deletion not changing page->index */
 			index = page->index;
@@ -635,6 +660,9 @@ EXPORT_SYMBOL(truncate_setsize);
  * with on-disk format, and the filesystem would not have to deal with
  * situations such as writepage being called for a page that has already
  * had its underlying blocks deallocated.
+ *
+ * Currently, the hole is not deduplicated here - the existing pages are
+ * truncated, and will be deduplicated as they are read in.
  */
 void truncate_pagecache_range(struct inode *inode, loff_t lstart, loff_t lend)
 {
