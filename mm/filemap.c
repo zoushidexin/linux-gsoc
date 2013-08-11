@@ -831,8 +831,7 @@ EXPORT_SYMBOL(find_or_create_page);
  * find_get_pages() returns the number of pages which were found.
  */
 unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
-			    unsigned int nr_pages, struct page **pages,
-			    pgoff_t *indexes)
+			    unsigned int nr_pages, struct page **pages)
 {
 	struct radix_tree_iter iter;
 	void **slot;
@@ -880,9 +879,9 @@ repeat:
 		pages[ret] = page;
 
 		/* If it's sparse, record its index */
-		if (unlikely(PageDedup(page)))
-			if (indexes)
-				indexes[ret] = iter.index;
+		if (unlikely(PageDedup(page))) {
+			
+		}
 
 		if (++ret == nr_pages)
 			break;

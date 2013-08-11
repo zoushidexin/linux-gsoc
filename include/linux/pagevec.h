@@ -8,29 +8,16 @@
 #ifndef _LINUX_PAGEVEC_H
 #define _LINUX_PAGEVEC_H
 
-/*
- * 15 pointers + 15 longs + two long's align the pagevec structure to a power
- * of two
- */
-#define PAGEVEC_SIZE	15
+/* 14 pointers + two long's align the pagevec structure to a power of two */
+#define PAGEVEC_SIZE	14
 
 struct page;
 struct address_space;
-
-/*
- * Big problem: dedup pages cannot internally track their index, and thus any
- * function that uses pagevecs and expects to access ->index is SOL.
- *
- * For now, keep an array of the indexes that is only populated if the page
- * is dedup. Eventually it would be ideal to have a way to do this that has
- * minimal cost in the normal case. But for now, I'm being lazy.
- */
 
 struct pagevec {
 	unsigned long nr;
 	unsigned long cold;
 	struct page *pages[PAGEVEC_SIZE];
-	pgoff_t indexes[PAGEVEC_SIZE]; /* For dedup pages */
 };
 
 void __pagevec_release(struct pagevec *pvec);

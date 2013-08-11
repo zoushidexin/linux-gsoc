@@ -54,6 +54,17 @@
 #include <linux/cleancache.h>
 #include <linux/dedup.h>
 
+struct dedup_index_rec {
+	pgoff_t index;
+	struct dedup_index *next;
+};
+
+struct pagevec_index_list {
+	struct dedup_index_rec *head;
+	struct dedup_index_rec *cur;
+	int alloc_size;
+};
+
 /* This is for non-sparse deduplicated pages */
 static int do_data_dedup_cow(struct page **page)
 {
