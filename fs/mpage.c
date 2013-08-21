@@ -28,6 +28,7 @@
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 #include <linux/cleancache.h>
+#include <linux/dedup.h>
 
 /*
  * I/O completion handler for multipage BIOs.
@@ -262,12 +263,12 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	}
 
 	if (first_hole != blocks_per_page) {
-		zero_user_segment(page, first_hole << blkbits, PAGE_CACHE_SIZE);
 		if (first_hole == 0) {
-			SetPageUptodate(page);
-			unlock_page(page);
+			dedup_undup_hole(page);
 			goto out;
 		}
+		/* Page is only partially a hole: write zeros to the hole */
+		zero_user_segment(page, first_hole << blkbits, PAGE_CACHE_SIZE);
 	} else if (fully_mapped) {
 		SetPageMappedToDisk(page);
 	}

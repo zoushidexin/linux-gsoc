@@ -284,7 +284,7 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 {
 	struct page *page;
 
-	page = find_get_page(swap_address_space(entry), entry.val);
+	page = find_get_page(swap_address_space(entry), entry.val, 0);
 
 	if (page)
 		INC_CACHE_INFO(find_success);
@@ -312,7 +312,7 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 		 * that would confuse statistics.
 		 */
 		found_page = find_get_page(swap_address_space(entry),
-					entry.val);
+					entry.val, 0);
 		if (found_page)
 			break;
 

@@ -20,6 +20,7 @@
 #include <linux/buffer_head.h>	/* grr. try_to_release_page,
 				   do_invalidatepage */
 #include <linux/cleancache.h>
+#include <linux/dedup.h>
 #include "internal.h"
 
 
@@ -244,6 +245,12 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
+			/* If it's dedup, the page pointer is actually the index */
+			if (unlikely(pvec.nr & (1UL << (i + PAGEVEC_SIZE_SHIFT)))) {
+				dedup_truncate(mapping, (unsigned long) page);
+				continue;
+			}
+
 			/* We rely upon deletion not changing page->index */
 			index = page->index;
 			if (index >= end)
@@ -322,6 +329,11 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
+			/* If it's dedup, the page pointer is actually the index */
+			if (unlikely(pvec.nr & (1UL << (i + PAGEVEC_SIZE_SHIFT)))) {
+				dedup_truncate(mapping, (unsigned long) page);
+				continue;
+			}
 			/* We rely upon deletion not changing page->index */
 			index = page->index;
 			if (index >= end)
@@ -395,6 +407,12 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 		mem_cgroup_uncharge_start();
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
+
+			/* If it's dedup, the page pointer is actually the index */
+			if (unlikely(pvec.nr & (1UL << (i + PAGEVEC_SIZE_SHIFT)))) {
+				dedup_truncate(mapping, (unsigned long) page);
+				continue;
+			}
 
 			/* We rely upon deletion not changing page->index */
 			index = page->index;
@@ -496,6 +514,12 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 		mem_cgroup_uncharge_start();
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
+
+			/* If it's dedup, the page pointer is actually the index */
+			if (unlikely(pvec.nr & (1UL << (i + PAGEVEC_SIZE_SHIFT)))) {
+				dedup_truncate(mapping, (unsigned long) page);
+				continue;
+			}
 
 			/* We rely upon deletion not changing page->index */
 			index = page->index;

@@ -33,6 +33,7 @@
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
+#include <linux/dedup.h>
 #include "internal.h"
 
 #define CREATE_TRACE_POINTS
@@ -687,11 +688,12 @@ int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
  * find_get_page - find and get a page reference
  * @mapping: the address_space to search
  * @offset: the page index
+ * @for_write: 1 if caller will write to returned page, 0 otherwise
  *
  * Is there a pagecache struct page at the given (mapping, offset) tuple?
  * If yes, increment its refcount and return it; if no, return NULL.
  */
-struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
+struct page *find_get_page(struct address_space *mapping, pgoff_t offset, int for_write)
 {
 	void **pagep;
 	struct page *page;
@@ -707,6 +709,12 @@ repeat:
 		if (radix_tree_exception(page)) {
 			if (radix_tree_deref_retry(page))
 				goto repeat;
+			if (radix_tree_dedup_entry(page)) {
+				radix_tree_dedup_mask(&page);
+				if (for_write)
+					dedup_do_cow(mapping, offset, &page);
+				goto out;
+			}
 			/*
 			 * Otherwise, shmem/tmpfs must be storing a swap entry
 			 * here as an exceptional entry: so return it without
@@ -714,9 +722,9 @@ repeat:
 			 */
 			goto out;
 		}
+
 		if (!page_cache_get_speculative(page))
 			goto repeat;
-
 		/*
 		 * Has the page moved?
 		 * This is part of the lockless pagecache protocol. See
@@ -738,6 +746,7 @@ EXPORT_SYMBOL(find_get_page);
  * find_lock_page - locate, pin and lock a pagecache page
  * @mapping: the address_space to search
  * @offset: the page index
+ * @for_write: 1 if caller will write to returned page, 0 otherwise
  *
  * Locates the desired pagecache page, locks it, increments its reference
  * count and returns its address.
@@ -749,7 +758,7 @@ struct page *find_lock_page(struct address_space *mapping, pgoff_t offset)
 	struct page *page;
 
 repeat:
-	page = find_get_page(mapping, offset);
+	page = find_get_page(mapping, offset, 1);
 	if (page && !radix_tree_exception(page)) {
 		lock_page(page);
 		/* Has the page been truncated? */
@@ -833,6 +842,7 @@ unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 	struct radix_tree_iter iter;
 	void **slot;
 	unsigned ret = 0;
+	unsigned long dedup_p = 0;
 
 	if (unlikely(!nr_pages))
 		return 0;
@@ -856,6 +866,11 @@ repeat:
 				WARN_ON(iter.index);
 				goto restart;
 			}
+			if (radix_tree_dedup_entry(page)) {
+				dedup_p |= 1UL << (ret + PAGEVEC_SIZE_SHIFT);
+				page = (struct page *) iter.index;
+				goto dedup_done;
+			}
 			/*
 			 * Otherwise, shmem/tmpfs must be storing a swap entry
 			 * here as an exceptional entry: so skip over it -
@@ -872,14 +887,14 @@ repeat:
 			page_cache_release(page);
 			goto repeat;
 		}
-
+dedup_done:
 		pages[ret] = page;
 		if (++ret == nr_pages)
 			break;
 	}
 
 	rcu_read_unlock();
-	return ret;
+	return ret | dedup_p;
 }
 
 /**
@@ -1045,7 +1060,7 @@ EXPORT_SYMBOL(find_get_pages_tag);
 struct page *
 grab_cache_page_nowait(struct address_space *mapping, pgoff_t index)
 {
-	struct page *page = find_get_page(mapping, index);
+	struct page *page = find_get_page(mapping, index, 0);
 
 	if (page) {
 		if (trylock_page(page))
@@ -1123,12 +1138,12 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 
 		cond_resched();
 find_page:
-		page = find_get_page(mapping, index);
+		page = find_get_page(mapping, index, 0);
 		if (!page) {
 			page_cache_sync_readahead(mapping,
 					ra, filp,
 					index, last_index - index);
-			page = find_get_page(mapping, index);
+			page = find_get_page(mapping, index, 0);
 			if (unlikely(page == NULL))
 				goto no_cached_page;
 		}
@@ -1624,7 +1639,7 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	/*
 	 * Do we have something in the page cache already?
 	 */
-	page = find_get_page(mapping, offset);
+	page = find_get_page(mapping, offset, 0);
 	if (likely(page) && !(vmf->flags & FAULT_FLAG_TRIED)) {
 		/*
 		 * We found the page, so try async readahead before
@@ -1638,7 +1653,7 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
 		ret = VM_FAULT_MAJOR;
 retry_find:
-		page = find_get_page(mapping, offset);
+		page = find_get_page(mapping, offset, 0);
 		if (!page)
 			goto no_cached_page;
 	}
@@ -1804,7 +1819,7 @@ static struct page *__read_cache_page(struct address_space *mapping,
 	struct page *page;
 	int err;
 repeat:
-	page = find_get_page(mapping, index);
+	page = find_get_page(mapping, index, 0);
 	if (!page) {
 		page = __page_cache_alloc(gfp | __GFP_COLD);
 		if (!page)
