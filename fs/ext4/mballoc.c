@@ -1139,7 +1139,7 @@ ext4_mb_load_buddy(struct super_block *sb, ext4_group_t group,
 
 	/* we could use find_or_create_page(), but it locks page
 	 * what we'd like to avoid in fast path ... */
-	page = find_get_page(inode->i_mapping, pnum);
+	page = find_get_page(inode->i_mapping, pnum, 1);
 	if (page == NULL || !PageUptodate(page)) {
 		if (page)
 			/*
@@ -1178,7 +1178,7 @@ ext4_mb_load_buddy(struct super_block *sb, ext4_group_t group,
 	pnum = block / blocks_per_page;
 	poff = block % blocks_per_page;
 
-	page = find_get_page(inode->i_mapping, pnum);
+	page = find_get_page(inode->i_mapping, pnum, 1);
 	if (page == NULL || !PageUptodate(page)) {
 		if (page)
 			page_cache_release(page);
