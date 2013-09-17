@@ -33,6 +33,7 @@
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
+#include <linux/dedup.h>
 #include "internal.h"
 
 #define CREATE_TRACE_POINTS
@@ -710,6 +711,13 @@ repeat:
 		if (radix_tree_exception(page)) {
 			if (radix_tree_deref_retry(page))
 				goto repeat;
+			if (radix_tree_dedup_entry(page)) {
+				radix_tree_dedup_mask(&page);
+				if (will_write == MAY_WRITE_PAGE)
+					dedup_do_cow(mapping, offset, &page);
+				page_cache_get(page);
+				goto out;
+			}
 			/*
 			 * Otherwise, shmem/tmpfs must be storing a swap entry
 			 * here as an exceptional entry: so return it without
