@@ -811,9 +811,10 @@ void lru_add_drain_all(void)
  * grabbed the page via the LRU.  If it did, give up: shrink_inactive_list()
  * will free it.
  */
-void release_pages(struct page **pages, int nr, int cold)
+void release_pages(struct page **pages, int pnr, int cold)
 {
 	int i;
+	int nr = pnr & PAGEVEC_SIZE_MASK;
 	LIST_HEAD(pages_to_free);
 	struct zone *zone = NULL;
 	struct lruvec *lruvec;
@@ -821,6 +822,10 @@ void release_pages(struct page **pages, int nr, int cold)
 
 	for (i = 0; i < nr; i++) {
 		struct page *page = pages[i];
+
+		/* If it's an index, there's nothing to release */
+		if (unlikely(pnr & (1UL << (i + PAGEVEC_SIZE_SHIFT))))
+			continue;
 
 		if (unlikely(PageCompound(page))) {
 			if (zone) {
@@ -876,7 +881,7 @@ EXPORT_SYMBOL(release_pages);
 void __pagevec_release(struct pagevec *pvec)
 {
 	lru_add_drain();
-	release_pages(pvec->pages, pagevec_count(pvec), pvec->cold);
+	release_pages(pvec->pages, pvec->nr, pvec->cold);
 	pagevec_reinit(pvec);
 }
 EXPORT_SYMBOL(__pagevec_release);

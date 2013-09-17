@@ -8,8 +8,13 @@
 #ifndef _LINUX_PAGEVEC_H
 #define _LINUX_PAGEVEC_H
 
-/* 14 pointers + two long's align the pagevec structure to a power of two */
-#define PAGEVEC_SIZE	14
+/* 14 pointers + two long's align the pagevec structure to a power of two
+ * The upper bits of the ->nr member of `struct pagevec` are used to note
+ * when the pages[] array contains an index of a dedup page, rather than
+ * a pointer to `struct page` */
+#define PAGEVEC_SIZE		14
+#define PAGEVEC_SIZE_SHIFT	4
+#define PAGEVEC_SIZE_MASK	~(-0x10UL)
 
 struct page;
 struct address_space;
@@ -41,12 +46,12 @@ static inline void pagevec_reinit(struct pagevec *pvec)
 
 static inline unsigned pagevec_count(struct pagevec *pvec)
 {
-	return pvec->nr;
+	return PAGEVEC_SIZE_MASK & pvec->nr;
 }
 
 static inline unsigned pagevec_space(struct pagevec *pvec)
 {
-	return PAGEVEC_SIZE - pvec->nr;
+	return PAGEVEC_SIZE - (PAGEVEC_SIZE_MASK & pvec->nr);
 }
 
 /*

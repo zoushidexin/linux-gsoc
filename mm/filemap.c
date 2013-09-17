@@ -836,6 +836,7 @@ unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 	struct radix_tree_iter iter;
 	void **slot;
 	unsigned ret = 0;
+	unsigned long dedup_p = 0;
 
 	if (unlikely(!nr_pages))
 		return 0;
@@ -859,6 +860,11 @@ repeat:
 				WARN_ON(iter.index);
 				goto restart;
 			}
+			if (radix_tree_dedup_entry(page)) {
+				dedup_p |= 1UL << (ret + PAGEVEC_SIZE_SHIFT);
+				page = (struct page *) iter.index;
+				goto dedup_done;
+			}
 			/*
 			 * Otherwise, shmem/tmpfs must be storing a swap entry
 			 * here as an exceptional entry: so skip over it -
@@ -875,14 +881,14 @@ repeat:
 			page_cache_release(page);
 			goto repeat;
 		}
-
+dedup_done:
 		pages[ret] = page;
 		if (++ret == nr_pages)
 			break;
 	}
 
 	rcu_read_unlock();
-	return ret;
+	return ret | dedup_p;
 }
 
 /**
