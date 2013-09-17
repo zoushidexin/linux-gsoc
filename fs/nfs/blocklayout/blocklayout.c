@@ -633,7 +633,7 @@ bl_find_get_zeroing_page(struct inode *inode, pgoff_t index,
 {
 	struct page *page;
 	int locked = 0;
-	page = find_get_page(inode->i_mapping, index);
+	page = find_get_page(inode->i_mapping, index, MAY_WRITE_PAGE);
 	if (page)
 		goto check_page;
 

@@ -451,7 +451,7 @@ static int zswap_get_swap_cache_page(swp_entry_t entry,
 		 * called after lookup_swap_cache() failed, re-calling
 		 * that would confuse statistics.
 		 */
-		found_page = find_get_page(swapper_space, entry.val);
+		found_page = find_get_page(swapper_space, entry.val, WILL_NOT_WRITE_PAGE);
 		if (found_page)
 			break;
 

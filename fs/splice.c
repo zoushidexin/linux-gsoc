@@ -353,7 +353,7 @@ __generic_file_splice_read(struct file *in, loff_t *ppos,
 		 * Page could be there, find_get_pages_contig() breaks on
 		 * the first hole.
 		 */
-		page = find_get_page(mapping, index);
+		page = find_get_page(mapping, index, WILL_NOT_WRITE_PAGE);
 		if (!page) {
 			/*
 			 * page didn't exist, allocate one.

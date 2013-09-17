@@ -243,8 +243,13 @@ static inline struct page *page_cache_alloc_readahead(struct address_space *x)
 
 typedef int filler_t(void *, struct page *);
 
+enum dedup_need_cow {
+	WILL_NOT_WRITE_PAGE,
+	MAY_WRITE_PAGE,
+};
+
 extern struct page * find_get_page(struct address_space *mapping,
-				pgoff_t index);
+				pgoff_t index, enum dedup_need_cow will_write);
 extern struct page * find_lock_page(struct address_space *mapping,
 				pgoff_t index);
 extern struct page * find_or_create_page(struct address_space *mapping,

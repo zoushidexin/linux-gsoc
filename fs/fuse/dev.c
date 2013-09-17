@@ -1659,7 +1659,7 @@ static int fuse_retrieve(struct fuse_conn *fc, struct inode *inode,
 		struct page *page;
 		unsigned int this_num;
 
-		page = find_get_page(mapping, index);
+		page = find_get_page(mapping, index, MAY_WRITE_PAGE);
 		if (!page)
 			break;
 

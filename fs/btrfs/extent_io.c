@@ -1357,7 +1357,7 @@ int extent_range_clear_dirty_for_io(struct inode *inode, u64 start, u64 end)
 	struct page *page;
 
 	while (index <= end_index) {
-		page = find_get_page(inode->i_mapping, index);
+		page = find_get_page(inode->i_mapping, index, WILL_NOT_WRITE_PAGE);
 		BUG_ON(!page); /* Pages should be in the extent_io_tree */
 		clear_page_dirty_for_io(page);
 		page_cache_release(page);
@@ -1373,7 +1373,7 @@ int extent_range_redirty_for_io(struct inode *inode, u64 start, u64 end)
 	struct page *page;
 
 	while (index <= end_index) {
-		page = find_get_page(inode->i_mapping, index);
+		page = find_get_page(inode->i_mapping, index, MAY_WRITE_PAGE);
 		BUG_ON(!page); /* Pages should be in the extent_io_tree */
 		account_page_redirty(page);
 		__set_page_dirty_nobuffers(page);
@@ -1393,7 +1393,7 @@ static int set_range_writeback(struct extent_io_tree *tree, u64 start, u64 end)
 	struct page *page;
 
 	while (index <= end_index) {
-		page = find_get_page(tree->mapping, index);
+		page = find_get_page(tree->mapping, index, MAY_WRITE_PAGE);
 		BUG_ON(!page); /* Pages should be in the extent_io_tree */
 		set_page_writeback(page);
 		page_cache_release(page);
@@ -3862,7 +3862,7 @@ int extent_write_locked_range(struct extent_io_tree *tree, struct inode *inode,
 	};
 
 	while (start <= end) {
-		page = find_get_page(mapping, start >> PAGE_CACHE_SHIFT);
+		page = find_get_page(mapping, start >> PAGE_CACHE_SHIFT, MAY_WRITE_PAGE);
 		if (clear_page_dirty_for_io(page))
 			ret = __extent_writepage(page, &wbc_writepages, &epd);
 		else {

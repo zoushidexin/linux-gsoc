@@ -70,12 +70,12 @@ static unsigned char mincore_page(struct address_space *mapping, pgoff_t pgoff)
 	 * any other file mapping (ie. marked !present and faulted in with
 	 * tmpfs's .fault). So swapped out tmpfs mappings are tested here.
 	 */
-	page = find_get_page(mapping, pgoff);
+	page = find_get_page(mapping, pgoff, WILL_NOT_WRITE_PAGE);
 #ifdef CONFIG_SWAP
 	/* shmem/tmpfs may return swap: account for swapcache page too. */
 	if (radix_tree_exceptional_entry(page)) {
 		swp_entry_t swap = radix_to_swp_entry(page);
-		page = find_get_page(swap_address_space(swap), swap.val);
+		page = find_get_page(swap_address_space(swap), swap.val, WILL_NOT_WRITE_PAGE);
 	}
 #endif
 	if (page) {

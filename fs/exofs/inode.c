@@ -581,7 +581,7 @@ static struct page *__r4w_get_page(void *priv, u64 offset, bool *uptodate)
 			return ZERO_PAGE(0);
 		}
 
-		page =  find_get_page(pcol->inode->i_mapping, index);
+		page =  find_get_page(pcol->inode->i_mapping, index, MAY_WRITE_PAGE);
 		if (!page) {
 			page = find_or_create_page(pcol->inode->i_mapping,
 						   index, GFP_NOFS);

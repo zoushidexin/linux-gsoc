@@ -78,7 +78,7 @@ static int logfs_mtd_erase_mapping(struct super_block *sb, loff_t ofs,
 	pgoff_t index = ofs >> PAGE_SHIFT;
 
 	for (index = ofs >> PAGE_SHIFT; index < (ofs + len) >> PAGE_SHIFT; index++) {
-		page = find_get_page(mapping, index);
+		page = find_get_page(mapping, index, MAY_WRITE_PAGE);
 		if (!page)
 			continue;
 		memset(page_address(page), 0xFF, PAGE_SIZE);

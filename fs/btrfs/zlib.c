@@ -105,7 +105,7 @@ static int zlib_compress_pages(struct list_head *ws,
 	workspace->def_strm.total_in = 0;
 	workspace->def_strm.total_out = 0;
 
-	in_page = find_get_page(mapping, start >> PAGE_CACHE_SHIFT);
+	in_page = find_get_page(mapping, start >> PAGE_CACHE_SHIFT, WILL_NOT_WRITE_PAGE);
 	data_in = kmap(in_page);
 
 	out_page = alloc_page(GFP_NOFS | __GFP_HIGHMEM);
@@ -176,7 +176,7 @@ static int zlib_compress_pages(struct list_head *ws,
 
 			start += PAGE_CACHE_SIZE;
 			in_page = find_get_page(mapping,
-						start >> PAGE_CACHE_SHIFT);
+						start >> PAGE_CACHE_SHIFT, WILL_NOT_WRITE_PAGE);
 			data_in = kmap(in_page);
 			workspace->def_strm.avail_in = min(bytes_left,
 							   PAGE_CACHE_SIZE);

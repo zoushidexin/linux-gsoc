@@ -718,7 +718,7 @@ void freeseg(struct super_block *sb, u32 segno)
 	start = dev_ofs(sb, segno, 0);
 	end = dev_ofs(sb, segno + 1, 0);
 	for (ofs = start; ofs < end; ofs += PAGE_SIZE) {
-		page = find_get_page(mapping, ofs >> PAGE_SHIFT);
+		page = find_get_page(mapping, ofs >> PAGE_SHIFT, WILL_NOT_WRITE_PAGE);
 		if (!page)
 			continue;
 		if (PagePrivate(page)) {

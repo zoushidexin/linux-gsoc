@@ -6784,7 +6784,7 @@ static struct page *mc_handle_swap_pte(struct vm_area_struct *vma,
 	 * Because lookup_swap_cache() updates some statistics counter,
 	 * we call find_get_page() with swapper_space directly.
 	 */
-	page = find_get_page(swap_address_space(ent), ent.val);
+	page = find_get_page(swap_address_space(ent), ent.val, WILL_NOT_WRITE_PAGE);
 	if (do_swap_account)
 		entry->val = ent.val;
 
@@ -6817,7 +6817,7 @@ static struct page *mc_handle_file_pte(struct vm_area_struct *vma,
 		pgoff = pte_to_pgoff(ptent);
 
 	/* page is moved even if it's not RSS of this task(page-faulted). */
-	page = find_get_page(mapping, pgoff);
+	page = find_get_page(mapping, pgoff, WILL_NOT_WRITE_PAGE);
 
 #ifdef CONFIG_SWAP
 	/* shmem/tmpfs may report page out on swap: account for that too. */
@@ -6825,7 +6825,7 @@ static struct page *mc_handle_file_pte(struct vm_area_struct *vma,
 		swp_entry_t swap = radix_to_swp_entry(page);
 		if (do_swap_account)
 			*entry = swap;
-		page = find_get_page(swap_address_space(swap), swap.val);
+		page = find_get_page(swap_address_space(swap), swap.val, WILL_NOT_WRITE_PAGE);
 	}
 #endif
 	return page;

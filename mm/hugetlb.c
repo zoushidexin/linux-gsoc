@@ -2754,7 +2754,7 @@ static bool hugetlbfs_pagecache_present(struct hstate *h,
 	mapping = vma->vm_file->f_mapping;
 	idx = vma_hugecache_offset(h, vma, address);
 
-	page = find_get_page(mapping, idx);
+	page = find_get_page(mapping, idxi, WILL_NOT_WRITE_PAGE);
 	if (page)
 		put_page(page);
 	return page != NULL;

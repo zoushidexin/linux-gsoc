@@ -194,7 +194,7 @@ static noinline int insert_inline_extent(struct btrfs_trans_handle *trans,
 						  compress_type);
 	} else {
 		page = find_get_page(inode->i_mapping,
-				     start >> PAGE_CACHE_SHIFT);
+				     start >> PAGE_CACHE_SHIFT, MAY_WRITE_PAGE);
 		btrfs_set_file_extent_compression(leaf, ei, 0);
 		kaddr = kmap_atomic(page);
 		offset = start & (PAGE_CACHE_SIZE - 1);

@@ -88,7 +88,7 @@ static int cachefiles_read_reissue(struct cachefiles_object *object,
 		return -ENODATA;
 	}
 
-	backpage2 = find_get_page(bmapping, backpage->index);
+	backpage2 = find_get_page(bmapping, backpage->index, WILL_NOT_WRITE_PAGE);
 	if (!backpage2) {
 		_leave(" = -ENODATA [gone]");
 		return -ENODATA;
@@ -254,7 +254,7 @@ static int cachefiles_read_backing_file_one(struct cachefiles_object *object,
 	newpage = NULL;
 
 	for (;;) {
-		backpage = find_get_page(bmapping, netpage->index);
+		backpage = find_get_page(bmapping, netpage->index, WILL_NOT_WRITE_PAGE);
 		if (backpage)
 			goto backing_page_already_present;
 
@@ -499,7 +499,7 @@ static int cachefiles_read_backing_file(struct cachefiles_object *object,
 		}
 
 		for (;;) {
-			backpage = find_get_page(bmapping, netpage->index);
+			backpage = find_get_page(bmapping, netpage->index, WILL_NOT_WRITE_PAGE);
 			if (backpage)
 				goto backing_page_already_present;
 

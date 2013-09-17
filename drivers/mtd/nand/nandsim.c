@@ -1355,7 +1355,7 @@ static int get_pages(struct nandsim *ns, struct file *file, size_t count, loff_t
 		return -EINVAL;
 	ns->held_cnt = 0;
 	for (index = start_index; index <= end_index; index++) {
-		page = find_get_page(mapping, index);
+		page = find_get_page(mapping, index, MAY_WRITE_PAGE);
 		if (page == NULL) {
 			page = find_or_create_page(mapping, index, GFP_NOFS);
 			if (page == NULL) {

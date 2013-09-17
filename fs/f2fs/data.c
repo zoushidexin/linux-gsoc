@@ -397,7 +397,7 @@ struct page *find_data_page(struct inode *inode, pgoff_t index, bool sync)
 	struct page *page;
 	int err;
 
-	page = find_get_page(mapping, index);
+	page = find_get_page(mapping, index, MAY_WRITE_PAGE);
 	if (page && PageUptodate(page))
 		return page;
 	f2fs_put_page(page, 0);

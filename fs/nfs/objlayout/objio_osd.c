@@ -499,7 +499,7 @@ static struct page *__r4w_get_page(void *priv, u64 offset, bool *uptodate)
 		return ZERO_PAGE(0);
 	}
 
-	page = find_get_page(mapping, index);
+	page = find_get_page(mapping, index, MAY_WRITE_PAGE);
 	if (!page) {
 		page = find_or_create_page(mapping, index, GFP_NOFS);
 		if (unlikely(!page)) {

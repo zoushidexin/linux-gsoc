@@ -116,7 +116,7 @@ static int lzo_compress_pages(struct list_head *ws,
 	*total_out = 0;
 	*total_in = 0;
 
-	in_page = find_get_page(mapping, start >> PAGE_CACHE_SHIFT);
+	in_page = find_get_page(mapping, start >> PAGE_CACHE_SHIFT, WILL_NOT_WRITE_PAGE);
 	data_in = kmap(in_page);
 
 	/*
@@ -224,7 +224,7 @@ static int lzo_compress_pages(struct list_head *ws,
 		page_cache_release(in_page);
 
 		start += PAGE_CACHE_SIZE;
-		in_page = find_get_page(mapping, start >> PAGE_CACHE_SHIFT);
+		in_page = find_get_page(mapping, start >> PAGE_CACHE_SHIFT, WILL_NOT_WRITE_PAGE);
 		data_in = kmap(in_page);
 		in_len = min(bytes_left, PAGE_CACHE_SIZE);
 	}

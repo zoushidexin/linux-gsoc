@@ -316,7 +316,7 @@ static struct page *logfs_get_write_page(struct inode *inode, u64 bix,
 	int err;
 
 repeat:
-	page = find_get_page(mapping, index);
+	page = find_get_page(mapping, index, MAY_WRITE_PAGE);
 	if (!page) {
 		page = __page_cache_alloc(GFP_NOFS);
 		if (!page)

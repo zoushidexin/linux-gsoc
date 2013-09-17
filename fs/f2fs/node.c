@@ -925,7 +925,7 @@ void ra_node_page(struct f2fs_sb_info *sbi, nid_t nid)
 	struct page *apage;
 	int err;
 
-	apage = find_get_page(NODE_MAPPING(sbi), nid);
+	apage = find_get_page(NODE_MAPPING(sbi), nid, WILL_NOT_WRITE_PAGE);
 	if (apage && PageUptodate(apage)) {
 		f2fs_put_page(apage, 0);
 		return;

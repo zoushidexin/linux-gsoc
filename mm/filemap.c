@@ -689,11 +689,12 @@ int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
  * find_get_page - find and get a page reference
  * @mapping: the address_space to search
  * @offset: the page index
+ * @will_write: MAY_WRITE_PAGE or WILL_NOT_WRITE_PAGE
  *
  * Is there a pagecache struct page at the given (mapping, offset) tuple?
  * If yes, increment its refcount and return it; if no, return NULL.
  */
-struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
+struct page *find_get_page(struct address_space *mapping, pgoff_t offset, enum dedup_need_cow will_write)
 {
 	void **pagep;
 	struct page *page;
@@ -751,7 +752,7 @@ struct page *find_lock_page(struct address_space *mapping, pgoff_t offset)
 	struct page *page;
 
 repeat:
-	page = find_get_page(mapping, offset);
+	page = find_get_page(mapping, offset, MAY_WRITE_PAGE);
 	if (page && !radix_tree_exception(page)) {
 		lock_page(page);
 		/* Has the page been truncated? */
@@ -1047,7 +1048,7 @@ EXPORT_SYMBOL(find_get_pages_tag);
 struct page *
 grab_cache_page_nowait(struct address_space *mapping, pgoff_t index)
 {
-	struct page *page = find_get_page(mapping, index);
+	struct page *page = find_get_page(mapping, index, WILL_NOT_WRITE_PAGE);
 
 	if (page) {
 		if (trylock_page(page))
@@ -1124,12 +1125,12 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 
 		cond_resched();
 find_page:
-		page = find_get_page(mapping, index);
+		page = find_get_page(mapping, index, WILL_NOT_WRITE_PAGE);
 		if (!page) {
 			page_cache_sync_readahead(mapping,
 					ra, filp,
 					index, last_index - index);
-			page = find_get_page(mapping, index);
+			page = find_get_page(mapping, index, WILL_NOT_WRITE_PAGE);
 			if (unlikely(page == NULL))
 				goto no_cached_page;
 		}
@@ -1624,7 +1625,7 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	/*
 	 * Do we have something in the page cache already?
 	 */
-	page = find_get_page(mapping, offset);
+	page = find_get_page(mapping, offset, WILL_NOT_WRITE_PAGE);
 	if (likely(page) && !(vmf->flags & FAULT_FLAG_TRIED)) {
 		/*
 		 * We found the page, so try async readahead before
@@ -1638,7 +1639,7 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
 		ret = VM_FAULT_MAJOR;
 retry_find:
-		page = find_get_page(mapping, offset);
+		page = find_get_page(mapping, offset, WILL_NOT_WRITE_PAGE);
 		if (!page)
 			goto no_cached_page;
 	}
@@ -1804,7 +1805,7 @@ static struct page *__read_cache_page(struct address_space *mapping,
 	struct page *page;
 	int err;
 repeat:
-	page = find_get_page(mapping, index);
+	page = find_get_page(mapping, index, WILL_NOT_WRITE_PAGE);
 	if (!page) {
 		page = __page_cache_alloc(gfp | __GFP_COLD);
 		if (!page)
