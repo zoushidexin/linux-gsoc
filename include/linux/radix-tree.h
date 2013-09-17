@@ -50,6 +50,10 @@
  */
 #define RADIX_TREE_EXCEPTIONAL_ENTRY	2
 #define RADIX_TREE_EXCEPTIONAL_SHIFT	2
+/*
+ * Set the 3rd bit to indicate a pointer to a deduplicated struct page
+ */
+#define RADIX_TREE_DEDUP_ENTRY 4UL
 
 static inline int radix_tree_is_indirect_ptr(void *ptr)
 {
@@ -192,6 +196,25 @@ static inline int radix_tree_exceptional_entry(void *arg)
 }
 
 /**
+ * radix_tree_dedup_entry	- radix_tree_deref_slot gave dedup entry?
+ * @arg:	value returned by radix_tree_deref_slot
+ * Returns:	0 if well-aligned pointer, non-0 if exceptional entry.
+ */
+static inline int radix_tree_dedup_entry(void *arg)
+{
+	return (unsigned long)arg & RADIX_TREE_DEDUP_ENTRY;
+}
+
+/**
+ * radix_tree_dedup_entry	- Flip the DEDUP_ENTRY flag
+ * @arg:	Pointer to pointer to be flipped
+ */
+static inline void radix_tree_dedup_mask(struct page **arg)
+{
+	*arg = (struct page *) ((unsigned long) *arg & ~RADIX_TREE_DEDUP_ENTRY);
+}
+
+/**
  * radix_tree_exception	- radix_tree_deref_slot returned either exception?
  * @arg:	value returned by radix_tree_deref_slot
  * Returns:	0 if well-aligned pointer, non-0 if either kind of exception.
@@ -199,7 +222,7 @@ static inline int radix_tree_exceptional_entry(void *arg)
 static inline int radix_tree_exception(void *arg)
 {
 	return unlikely((unsigned long)arg &
-		(RADIX_TREE_INDIRECT_PTR | RADIX_TREE_EXCEPTIONAL_ENTRY));
+		(RADIX_TREE_INDIRECT_PTR | RADIX_TREE_EXCEPTIONAL_ENTRY | RADIX_TREE_DEDUP_ENTRY));
 }
 
 /**
