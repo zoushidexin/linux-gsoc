@@ -11,6 +11,7 @@
 #include <linux/pagevec.h>
 #include <linux/prefetch.h>
 #include <linux/cleancache.h>
+#include <linux/dedup.h>
 #include "extent_io.h"
 #include "extent_map.h"
 #include "ctree.h"
@@ -2803,6 +2804,7 @@ static int __do_readpage(struct extent_io_tree *tree,
 	int ret;
 	int nr = 0;
 	int parent_locked = *bio_flags & EXTENT_BIO_PARENT_LOCKED;
+	int whole_page_is_hole = 1;
 	size_t pg_offset = 0;
 	size_t iosize;
 	size_t disk_io_size;
@@ -2904,6 +2906,8 @@ static int __do_readpage(struct extent_io_tree *tree,
 			cur = cur + iosize;
 			pg_offset += iosize;
 			continue;
+		} else {
+			whole_page_is_hole = 0;
 		}
 		/* the get_extent function already copied into the page */
 		if (test_range_bit(tree, cur, cur_end,
@@ -2944,6 +2948,10 @@ static int __do_readpage(struct extent_io_tree *tree,
 		}
 		cur = cur + iosize;
 		pg_offset += iosize;
+	}
+	if (whole_page_is_hole) {
+		page->mapping->a_ops->invalidatepage(page, page->index, PAGE_CACHE_SIZE);
+		dedup_undup_hole(page);
 	}
 out:
 	if (!nr) {
