@@ -60,6 +60,7 @@
 #include <linux/migrate.h>
 #include <linux/string.h>
 #include <linux/dma-debug.h>
+#include <linux/dedup.h>
 
 #include <asm/io.h>
 #include <asm/pgalloc.h>
@@ -2670,6 +2671,19 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		if (vma->vm_ops && vma->vm_ops->page_mkwrite) {
 			struct vm_fault vmf;
 			int tmp;
+
+			/* COW dedup pages */
+			if (unlikely(PageReserved(old_page))) {
+				dedup_do_cow(vma->vm_file->f_mapping, (address - vma->vm_start) / PAGE_SIZE, &old_page);
+				if (!old_page)
+					goto oom;
+				flush_icache_page(vma, old_page);
+				entry = mk_pte(old_page, vma->vm_page_prot);
+				entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+				page_add_file_rmap(old_page);
+				set_pte_at(mm, address, page_table, entry);
+				update_mmu_cache(vma, address, page_table);
+			}
 
 			vmf.virtual_address = (void __user *)(address &
 								PAGE_MASK);

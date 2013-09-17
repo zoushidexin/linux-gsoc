@@ -2047,6 +2047,10 @@ static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 		for (i = 0; i < nr_pages; i++) {
 			struct page *page = pvec.pages[i];
 
+			/* We don't write back to dedup pages here */
+			if (unlikely(pvec.nr & (1UL << (i + PAGEVEC_SIZE_SHIFT))))
+				continue;
+
 			if (page->index > end)
 				break;
 			/* Up to 'end' pages must be contiguous */

@@ -1663,6 +1663,9 @@ retry_find:
 		return ret | VM_FAULT_RETRY;
 	}
 
+	if (PageReserved(page))
+		goto found_it;
+
 	/* Did it get truncated? */
 	if (unlikely(page->mapping != mapping)) {
 		unlock_page(page);
@@ -1670,7 +1673,7 @@ retry_find:
 		goto retry_find;
 	}
 	VM_BUG_ON_PAGE(page->index != offset, page);
-
+found_it:
 	/*
 	 * We have a locked page in the page cache, now we need to check
 	 * that it's up-to-date. If not, it is going to be due to an error.
