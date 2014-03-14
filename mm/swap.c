@@ -822,6 +822,10 @@ void release_pages(struct page **pages, int nr, int cold)
 	for (i = 0; i < nr; i++) {
 		struct page *page = pages[i];
 
+		/* If it's an index for a hole, there's nothing to release */
+		if (unlikely(page_is_offset(&cold, i)))
+			continue;
+
 		if (unlikely(PageCompound(page))) {
 			if (zone) {
 				spin_unlock_irqrestore(&zone->lru_lock, flags);
@@ -859,7 +863,7 @@ void release_pages(struct page **pages, int nr, int cold)
 	if (zone)
 		spin_unlock_irqrestore(&zone->lru_lock, flags);
 
-	free_hot_cold_page_list(&pages_to_free, cold);
+	free_hot_cold_page_list(&pages_to_free, cold & 1UL);
 }
 EXPORT_SYMBOL(release_pages);
 
@@ -872,6 +876,8 @@ EXPORT_SYMBOL(release_pages);
  * So __pagevec_release() will drain those queues here.  __pagevec_lru_add()
  * and __pagevec_lru_add_active() call release_pages() directly to avoid
  * mutual recursion.
+ *
+ * This should be the only function directly accessing ->cold
  */
 void __pagevec_release(struct pagevec *pvec)
 {
@@ -966,7 +972,7 @@ EXPORT_SYMBOL(__pagevec_lru_add);
 unsigned pagevec_lookup(struct pagevec *pvec, struct address_space *mapping,
 		pgoff_t start, unsigned nr_pages)
 {
-	pvec->nr = find_get_pages(mapping, start, nr_pages, pvec->pages);
+	pvec->nr = find_get_pages(mapping, start, nr_pages, pvec->pages, &pvec->cold);
 	return pagevec_count(pvec);
 }
 EXPORT_SYMBOL(pagevec_lookup);

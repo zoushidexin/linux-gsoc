@@ -33,6 +33,7 @@
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
+#include <linux/holes.h>
 #include "internal.h"
 
 #define CREATE_TRACE_POINTS
@@ -686,14 +687,17 @@ int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 }
 
 /**
- * find_get_page - find and get a page reference
+ * __find_get_page - find and get a page reference
  * @mapping: the address_space to search
  * @offset: the page index
  *
  * Is there a pagecache struct page at the given (mapping, offset) tuple?
  * If yes, increment its refcount and return it; if no, return NULL.
+ *
+ * __find_get_page() will return PAGECACHE_HOLE_MAGIC if there is a hole at
+ * offset that is not backed by a physical page.
  */
-struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
+static struct page *__find_get_page(struct address_space *mapping, pgoff_t offset)
 {
 	void **pagep;
 	struct page *page;
@@ -705,6 +709,8 @@ repeat:
 	if (pagep) {
 		page = radix_tree_deref_slot(pagep);
 		if (unlikely(!page))
+			goto out;
+		if (unlikely(page_is_hole(page)))
 			goto out;
 		if (radix_tree_exception(page)) {
 			if (radix_tree_deref_retry(page))
@@ -734,6 +740,30 @@ out:
 
 	return page;
 }
+
+/**
+ * find_get_page - find and get a page reference
+ * @mapping: the address_space to search
+ * @offset: the page index
+ *
+ * Is there a pagecache struct page at the given (mapping, offset) tuple?
+ * If yes, increment its refcount and return it; if no, return NULL.
+ *
+ * find_get_page() COW's any non-backed holes it finds in the page cache.
+ */
+struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
+{
+	struct page *page;
+repeat:
+	page = __find_get_page(mapping, offset);
+	if (unlikely(page_is_hole(page))) {
+		cow_pagecache_hole(mapping, offset, &page);
+		if (!page)
+			goto repeat; /* FIXME: -ENOMEM allocating new page, try again */
+		page_cache_get(page);
+	}
+	return page;
+}
 EXPORT_SYMBOL(find_get_page);
 
 /**
@@ -745,6 +775,9 @@ EXPORT_SYMBOL(find_get_page);
  * count and returns its address.
  *
  * Returns zero if the page was not present. find_lock_page() may sleep.
+ *
+ * find_lock_page() *always* COW's holes; the assumption is that if you need to
+ * lock the page you're probably going to alter it or write to it.
  */
 struct page *find_lock_page(struct address_space *mapping, pgoff_t offset)
 {
@@ -819,6 +852,7 @@ EXPORT_SYMBOL(find_or_create_page);
  * @start:	The starting page index
  * @nr_pages:	The maximum number of pages
  * @pages:	Where the resulting pages are placed
+ * @index_mask: pagevec->cold, used to indicate indexes for truncation of holes
  *
  * find_get_pages() will search for and return a group of up to
  * @nr_pages pages in the mapping.  The pages are placed at @pages.
@@ -830,7 +864,8 @@ EXPORT_SYMBOL(find_or_create_page);
  * find_get_pages() returns the number of pages which were found.
  */
 unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
-			    unsigned int nr_pages, struct page **pages)
+			    unsigned int nr_pages, struct page **pages,
+			    unsigned long *index_mask)
 {
 	struct radix_tree_iter iter;
 	void **slot;
@@ -866,6 +901,13 @@ repeat:
 			continue;
 		}
 
+		/* If it's a hole, flag it and store its index */
+		if (unlikely(page_is_hole(page))) {
+			mark_page_as_offset(index_mask, ret);
+			page = (struct page *) iter.index;
+			goto page_was_hole;
+		}
+
 		if (!page_cache_get_speculative(page))
 			goto repeat;
 
@@ -874,7 +916,7 @@ repeat:
 			page_cache_release(page);
 			goto repeat;
 		}
-
+page_was_hole:
 		pages[ret] = page;
 		if (++ret == nr_pages)
 			break;
@@ -1124,14 +1166,17 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 
 		cond_resched();
 find_page:
-		page = find_get_page(mapping, index);
+		page = __find_get_page(mapping, index);
 		if (!page) {
 			page_cache_sync_readahead(mapping,
 					ra, filp,
 					index, last_index - index);
-			page = find_get_page(mapping, index);
+			page = __find_get_page(mapping, index);
 			if (unlikely(page == NULL))
 				goto no_cached_page;
+		}
+		if (unlikely(page_is_hole(page))) {
+			/* FIXME: Handle this! */
 		}
 		if (PageReadahead(page)) {
 			page_cache_async_readahead(mapping,

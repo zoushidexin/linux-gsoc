@@ -31,12 +31,13 @@ unsigned pagevec_lookup_tag(struct pagevec *pvec,
 static inline void pagevec_init(struct pagevec *pvec, int cold)
 {
 	pvec->nr = 0;
-	pvec->cold = cold;
+	pvec->cold = (cold & 1UL);
 }
 
 static inline void pagevec_reinit(struct pagevec *pvec)
 {
 	pvec->nr = 0;
+	pvec->cold &= 1UL;
 }
 
 static inline unsigned pagevec_count(struct pagevec *pvec)
@@ -47,6 +48,27 @@ static inline unsigned pagevec_count(struct pagevec *pvec)
 static inline unsigned pagevec_space(struct pagevec *pvec)
 {
 	return PAGEVEC_SIZE - pvec->nr;
+}
+
+static inline unsigned pagevec_cold(struct pagevec *pvec)
+{
+	return pvec->cold & 1UL;
+}
+
+/* When truncating pages, we rely on page->index to remove the page from the
+ * particular radix tree; however, radix tree entries representing holes have
+ * no struct page associated with them. So, in that case, use the upper bits
+ * of the ->cold member of struct pagevec to indicate that the struct page
+ * pointer at that offset in pages[] is actually the index to truncate, and
+ * not a pointer. */
+static inline unsigned page_is_offset(unsigned long *cold, int offset)
+{
+	return *cold & (1UL << (offset + 1));
+}
+
+static inline void mark_page_as_offset(unsigned long *cold, int offset)
+{
+	*cold |= (1UL << (offset + 1));
 }
 
 /*
