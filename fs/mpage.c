@@ -28,6 +28,7 @@
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 #include <linux/cleancache.h>
+#include <linux/holes.h>
 
 /*
  * I/O completion handler for multipage BIOs.
@@ -168,6 +169,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	struct block_device *bdev = NULL;
 	int length;
 	int fully_mapped = 1;
+	int page_is_hole = 0;
 	unsigned nblocks;
 	unsigned relative_block;
 
@@ -261,11 +263,15 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	}
 
 	if (first_hole != blocks_per_page) {
-		zero_user_segment(page, first_hole << blkbits, PAGE_CACHE_SIZE);
 		if (first_hole == 0) {
-			SetPageUptodate(page);
+			/* Entire page is a hole - unback it */
+			unback_pagecache_hole(page);
+			page_is_hole = 1;
 			unlock_page(page);
 			goto out;
+		} else {
+			/* Page is only partially a hole, so just zero that part */
+			zero_user_segment(page, first_hole << blkbits, PAGE_CACHE_SIZE);
 		}
 	} else if (fully_mapped) {
 		SetPageMappedToDisk(page);
@@ -306,6 +312,8 @@ alloc_new:
 	else
 		*last_block_in_bio = blocks[blocks_per_page - 1];
 out:
+	if (unlikely(page_is_hole))
+		set_bit(0, &bio);
 	return bio;
 
 confused:
@@ -385,6 +393,9 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
 					&last_block_in_bio, &map_bh,
 					&first_logical_block,
 					get_block);
+			/* We drop our reference to the page here, so we don't
+			 * care if it was a hole. Just clear the low bit. */
+			clear_bit(0, &bio);
 		}
 		page_cache_release(page);
 	}
@@ -404,14 +415,17 @@ int mpage_readpage(struct page *page, get_block_t get_block)
 	sector_t last_block_in_bio = 0;
 	struct buffer_head map_bh;
 	unsigned long first_logical_block = 0;
+	int ret = 0;
 
 	map_bh.b_state = 0;
 	map_bh.b_size = 0;
 	bio = do_mpage_readpage(bio, page, 1, &last_block_in_bio,
 			&map_bh, &first_logical_block, get_block);
+	if (unlikely(test_and_clear_bit(0, &bio)))
+		ret = AOP_PAGE_WAS_HOLE;
 	if (bio)
 		mpage_bio_submit(READ, bio);
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(mpage_readpage);
 

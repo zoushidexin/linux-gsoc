@@ -45,6 +45,11 @@ void unback_pagecache_hole(struct page *page)
 	spin_unlock_irq(&page->mapping->tree_lock);
 	rcu_read_unlock();
 
+	/*
+	 * No longer referenced from the radix tree. Caller still might have reference
+	 * though, depending on how we got here, so this doesn't always free the page
+	 */
+	page_cache_release(page);
 	page->mapping = NULL;
 	num_cur_hole_pages++;
 	num_all_hole_pages++;
@@ -58,9 +63,9 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
 
 	VM_BUG_ON_PAGE(!page_is_hole(*page), *page);
 
+	/* FIXME: How do we handle -ENOMEM here? */
 	new_page = __page_cache_alloc(mapping_gfp_mask(mapping) & ~__GFP_WAIT);
-	if (!new_page)
-		goto out;
+	BUG_ON(!new_page);
 
 	/* Increment for the reference about to be put in the radix tree */
 	page_cache_get(new_page);
@@ -80,6 +85,7 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
 		num_all_holes_cow++;
 		num_cur_hole_pages--;
 	} else {
+		/* Somebody beat us to it: free the page we allocated and return the new one */
 		page_cache_release(new_page);
 		new_page = slot_page;
 	}

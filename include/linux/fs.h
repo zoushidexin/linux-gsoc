@@ -269,6 +269,11 @@ struct iattr {
  *  			reference, it should drop it before retrying.  Returned
  *  			by readpage().
  *
+ * @AOP_PAGE_WAS_HOLE: Returned by ->readpage() functions to indicate that the
+ * 		       page being read into was actually a hole, and a hole has
+ * 		       been added to the radix tree at its offset. The caller
+ * 		       should free the page that was passed to ->readpage().
+ *
  * address_space_operation functions return these large constants to indicate
  * special semantics to the caller.  These are much larger than the bytes in a
  * page to allow for functions that return the number of bytes operated on in a
@@ -278,6 +283,7 @@ struct iattr {
 enum positive_aop_returns {
 	AOP_WRITEPAGE_ACTIVATE	= 0x80000,
 	AOP_TRUNCATED_PAGE	= 0x80001,
+	AOP_PAGE_WAS_HOLE	= 0x80002,
 };
 
 #define AOP_FLAG_UNINTERRUPTIBLE	0x0001 /* will not do a short write */

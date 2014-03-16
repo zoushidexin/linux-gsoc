@@ -687,7 +687,7 @@ int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 }
 
 /**
- * __find_get_page - find and get a page reference
+ * __find_get_page - find and get a page reference, possibly returning holes.
  * @mapping: the address_space to search
  * @offset: the page index
  *
@@ -748,18 +748,12 @@ out:
  *
  * Is there a pagecache struct page at the given (mapping, offset) tuple?
  * If yes, increment its refcount and return it; if no, return NULL.
- *
- * find_get_page() COW's any non-backed holes it finds in the page cache.
  */
 struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
 {
-	struct page *page;
-repeat:
-	page = __find_get_page(mapping, offset);
+	struct page *page = __find_get_page(mapping, offset);
 	if (unlikely(page_is_hole(page))) {
 		cow_pagecache_hole(mapping, offset, &page);
-		if (!page)
-			goto repeat; /* FIXME: -ENOMEM allocating new page, try again */
 		page_cache_get(page);
 	}
 	return page;
@@ -1176,7 +1170,12 @@ find_page:
 				goto no_cached_page;
 		}
 		if (unlikely(page_is_hole(page))) {
-			/* FIXME: Handle this! */
+readpage_got_hole:
+			/* I hate this, but the alternative is duplicating most
+			 * of the code after page_ok here in this block... */
+			page = ZERO_PAGE(0);
+			page_cache_get(page);
+			goto page_ok;
 		}
 		if (PageReadahead(page)) {
 			page_cache_async_readahead(mapping,
@@ -1296,6 +1295,11 @@ readpage:
 			if (error == AOP_TRUNCATED_PAGE) {
 				page_cache_release(page);
 				goto find_page;
+			}
+			if (error == AOP_PAGE_WAS_HOLE) {
+				/* The page we allocated is no longer needed */
+				page_cache_release(page);
+				goto readpage_got_hole;
 			}
 			goto readpage_error;
 		}
