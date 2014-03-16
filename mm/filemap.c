@@ -686,17 +686,6 @@ int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 	}
 }
 
-/**
- * __find_get_page - find and get a page reference, possibly returning holes.
- * @mapping: the address_space to search
- * @offset: the page index
- *
- * Is there a pagecache struct page at the given (mapping, offset) tuple?
- * If yes, increment its refcount and return it; if no, return NULL.
- *
- * __find_get_page() will return PAGECACHE_HOLE_MAGIC if there is a hole at
- * offset that is not backed by a physical page.
- */
 static struct page *__find_get_page(struct address_space *mapping, pgoff_t offset)
 {
 	void **pagep;
@@ -748,17 +737,38 @@ out:
  *
  * Is there a pagecache struct page at the given (mapping, offset) tuple?
  * If yes, increment its refcount and return it; if no, return NULL.
+ *
+ * The caller shouldn't be ignoring holes by using this function, hence the
+ * WARN(). Eventually, that WARN will become a BUG.
  */
 struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
 {
 	struct page *page = __find_get_page(mapping, offset);
 	if (unlikely(page_is_hole(page))) {
+		WARN_ON_ONCE(1);
 		cow_pagecache_hole(mapping, offset, &page);
 		page_cache_get(page);
 	}
 	return page;
 }
 EXPORT_SYMBOL(find_get_page);
+
+/**
+ * find_get_page_holey - find and get a page reference, possibly returning holes.
+ * @mapping: the address_space to search
+ * @offset: the page index
+ *
+ * Is there a pagecache struct page at the given (mapping, offset) tuple?
+ * If yes, increment its refcount and return it; if no, return NULL.
+ *
+ * find_get_page_holey() will return PAGECACHE_HOLE_MAGIC if there is a hole at
+ * offset that is not backed by a physical page.
+ */
+struct page *find_get_page_holey(struct address_space *mapping, pgoff_t offset)
+{
+	return __find_get_page(mapping, offset);
+}
+EXPORT_SYMBOL_GPL(find_get_page_holey);
 
 /**
  * find_lock_page - locate, pin and lock a pagecache page
@@ -778,7 +788,11 @@ struct page *find_lock_page(struct address_space *mapping, pgoff_t offset)
 	struct page *page;
 
 repeat:
-	page = find_get_page(mapping, offset);
+	page = __find_get_page(mapping, offset);
+	if (unlikely(page_is_hole(page))) {
+		cow_pagecache_hole(mapping, offset, &page);
+		page_cache_get(page);
+	}
 	if (page && !radix_tree_exception(page)) {
 		lock_page(page);
 		/* Has the page been truncated? */
