@@ -76,7 +76,7 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
 	rcu_read_lock();
 	spin_lock_irq(&mapping->tree_lock);
 
-	/* Somebody else could have COW'd the page while we were waiting on the lock */
+	/* Somebody else could have COW'd the page while we were waiting on the lock... */
 	slot = radix_tree_lookup_slot(&mapping->page_tree, index);
 	slot_page = radix_tree_deref_slot(slot);
 	if (likely(slot_page == *page)) {
@@ -112,19 +112,29 @@ void truncate_pagecache_hole(struct address_space *mapping, pgoff_t index)
 EXPORT_SYMBOL_GPL(truncate_pagecache_hole);
 
 /* This only invoked for not present faults */
-int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma, unsigned long address, pmd_t *pmd, pgoff_t pgoff, unsigned int flags, pte_t orig_pte)
+int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
+		unsigned long address, pmd_t *pmd, pgoff_t pgoff,
+		unsigned int flags, pte_t orig_pte, struct page *cow_page)
 {
+	sb_start_pagefault(inode->i_sb);
+	sb_end_pagefault(inode->i_sb);
+
 	if (flags & FAULT_FLAG_WRITE) {
+		file_update_time(vma->vm_file);
 		if (vma->vm_flags & VM_SHARED) {
-			/* MAP_SHARED|MAP_FILE write fault */
+			/* MAP_SHARED write fault */
 		} else {
-			/* MAP_PRIVATE|MAP_FILE write fault */
+			BUG_ON(!cow_page);
+			copy_user_highpage(cow_page, ZERO_PAGE(0), address, vma);
+			__SetPageUptodate(cow_page);
 		}
+	}
+
 	} else {
 		if (vma->vm_flags & VM_SHARED) {
 			/* MAP_SHARED|MAP_FILE read fault */
 		} else {
-			/* MAP_PRIVATE_MAP_FILE read fault */
+			/* MAP_PRIVATE|MAP_FILE read fault */
 		}
 	}
 }
