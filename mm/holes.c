@@ -54,6 +54,7 @@ void unback_pagecache_hole(struct page *page)
 	num_cur_hole_pages++;
 	num_all_hole_pages++;
 }
+EXPORT_SYMBOL_GPL(unback_pagecache_hole);
 
 void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct page **page)
 {
@@ -96,6 +97,7 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
 out:
 	*page = new_page;
 }
+EXPORT_SYMBOL_GPL(cow_pagecache_hole);
 
 void truncate_pagecache_hole(struct address_space *mapping, pgoff_t index)
 {
@@ -105,4 +107,24 @@ void truncate_pagecache_hole(struct address_space *mapping, pgoff_t index)
 	__dec_zone_page_state(PAGECACHE_HOLE_MAGIC, NR_FILE_PAGES);
 	spin_unlock_irq(&mapping->tree_lock);
 	num_cur_hole_pages--;
+
+}
+EXPORT_SYMBOL_GPL(truncate_pagecache_hole);
+
+/* This only invoked for not present faults */
+int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma, unsigned long address, pmd_t *pmd, pgoff_t pgoff, unsigned int flags, pte_t orig_pte)
+{
+	if (flags & FAULT_FLAG_WRITE) {
+		if (vma->vm_flags & VM_SHARED) {
+			/* MAP_SHARED|MAP_FILE write fault */
+		} else {
+			/* MAP_PRIVATE|MAP_FILE write fault */
+		}
+	} else {
+		if (vma->vm_flags & VM_SHARED) {
+			/* MAP_SHARED|MAP_FILE read fault */
+		} else {
+			/* MAP_PRIVATE_MAP_FILE read fault */
+		}
+	}
 }

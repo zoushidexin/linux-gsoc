@@ -31,7 +31,7 @@ unsigned pagevec_lookup_tag(struct pagevec *pvec,
 static inline void pagevec_init(struct pagevec *pvec, int cold)
 {
 	pvec->nr = 0;
-	pvec->cold = (cold & 1UL);
+	pvec->cold = test_bit(0, &cold);
 }
 
 static inline void pagevec_reinit(struct pagevec *pvec)
@@ -52,7 +52,7 @@ static inline unsigned pagevec_space(struct pagevec *pvec)
 
 static inline unsigned pagevec_cold(struct pagevec *pvec)
 {
-	return pvec->cold & 1UL;
+	return test_bit(0, &pvec->cold)
 }
 
 /* When truncating pages, we rely on page->index to remove the page from the
@@ -63,12 +63,12 @@ static inline unsigned pagevec_cold(struct pagevec *pvec)
  * not a pointer. */
 static inline unsigned page_is_offset(unsigned long *cold, int offset)
 {
-	return *cold & (1UL << (offset + 1));
+	return test_bit(offset + 1, cold);
 }
 
 static inline void mark_page_as_offset(unsigned long *cold, int offset)
 {
-	*cold |= (1UL << (offset + 1));
+	set_bit(offset + 1, cold);
 }
 
 /*

@@ -2047,6 +2047,12 @@ static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 		for (i = 0; i < nr_pages; i++) {
 			struct page *page = pvec.pages[i];
 
+			/* Ignore pages that are unbacked holes.
+			 * FIXME: Prove that this can actually happen, I don't
+			 * know where these pages are actually coming from... */
+			if (unlikely(page_is_offset(&pvec->cold, i)))
+				continue;
+
 			if (page->index > end)
 				break;
 			/* Up to 'end' pages must be contiguous */

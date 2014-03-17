@@ -2671,6 +2671,23 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct *vma,
 			struct vm_fault vmf;
 			int tmp;
 
+			/* COW unbacked holes in the page cache when written to.
+			 * XXX: Are we sure we can't get ZERO_PAGE here outside
+			 * of file mappings? (MAP_ANON|MAP_SHARED?)*/
+			if (unlikely(old_page == ZERO_PAGE(0))) {
+				cow_pagecache_hole(vma->vm_file->f_mapping,
+						(address - vma->vm_start) / PAGE_SIZE, &old_page);
+				if(!old_page)
+					goto oom;
+
+				flush_icache_page(vma, old_page);
+				entry = mk_pte(old_page, vma->vm_page_prot);
+				entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+				page_add_file_rmap(old_page);
+				set_pte_at(mm, address, page_table, entry);
+				update_mmu_cache(vma, address, page_table);
+			}
+
 			vmf.virtual_address = (void __user *)(address &
 								PAGE_MASK);
 			vmf.pgoff = old_page->index;
@@ -3341,8 +3358,11 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	ret = vma->vm_ops->fault(vma, &vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE |
-			    VM_FAULT_RETRY)))
+			    VM_FAULT_RETRY | VM_FAULT_HOLE))) {
+		if (ret & VM_FAULT_HOLE)
+			return mmap_unbacked_hole_page(mm, vma, address, pmd, pgoff, flags, orig_pte);
 		goto uncharge_out;
+	}
 
 	if (unlikely(PageHWPoison(vmf.page))) {
 		if (ret & VM_FAULT_LOCKED)
