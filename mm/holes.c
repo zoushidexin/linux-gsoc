@@ -45,10 +45,6 @@ void unback_pagecache_hole(struct page *page)
 	spin_unlock_irq(&page->mapping->tree_lock);
 	rcu_read_unlock();
 
-	/*
-	 * No longer referenced from the radix tree. Caller still might have reference
-	 * though, depending on how we got here, so this doesn't always free the page
-	 */
 	page_cache_release(page);
 	page->mapping = NULL;
 	num_cur_hole_pages++;
@@ -62,7 +58,7 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
 	struct page *slot_page, *new_page;
 	int r;
 
-	VM_BUG_ON_PAGE(!page_is_hole(*page), *page);
+	VM_BUG_ON(!page_is_hole(*page));
 
 	/* FIXME: How do we handle -ENOMEM here? */
 	new_page = __page_cache_alloc(mapping_gfp_mask(mapping) & ~__GFP_WAIT);
@@ -73,14 +69,16 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
 	new_page->mapping = mapping;
 	new_page->index = index;
 
+	/* Write the zeros before we take the lock */
+	zero_user_segment(new_page, 0, PAGE_CACHE_SIZE);
+
 	rcu_read_lock();
 	spin_lock_irq(&mapping->tree_lock);
 
 	/* Somebody else could have COW'd the page while we were waiting on the lock... */
 	slot = radix_tree_lookup_slot(&mapping->page_tree, index);
 	slot_page = radix_tree_deref_slot(slot);
-	if (likely(slot_page == *page)) {
-		zero_user_segment(new_page, 0, PAGE_CACHE_SIZE);
+	if (likely(page_is_hole(slot_page))) {
 		SetPageUptodate(new_page);
 		radix_tree_replace_slot(slot, new_page);
 		num_all_holes_cow++;
@@ -111,11 +109,17 @@ void truncate_pagecache_hole(struct address_space *mapping, pgoff_t index)
 }
 EXPORT_SYMBOL_GPL(truncate_pagecache_hole);
 
-/* This only invoked for not present faults */
+/* This only invoked for not present faults
+ * Much of this code is duplicated from __do_fault(), but I don't see much
+ * of a way around that... we don't want to needlessly lock the ZERO_PAGE,
+ * and we can't treat it like a normal page without blowing things up... */
 int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long address, pmd_t *pmd, pgoff_t pgoff,
 		unsigned int flags, pte_t orig_pte, struct page *cow_page)
 {
+	spinlock_t *ptl;
+
+	/* These go somewhere... */
 	sb_start_pagefault(inode->i_sb);
 	sb_end_pagefault(inode->i_sb);
 
@@ -124,17 +128,17 @@ int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		if (vma->vm_flags & VM_SHARED) {
 			/* MAP_SHARED write fault */
 		} else {
-			BUG_ON(!cow_page);
+			/* MAP_ANON write fault */
+			VM_BUG_ON(!cow_page);
 			copy_user_highpage(cow_page, ZERO_PAGE(0), address, vma);
 			__SetPageUptodate(cow_page);
 		}
 	}
 
-	} else {
-		if (vma->vm_flags & VM_SHARED) {
-			/* MAP_SHARED|MAP_FILE read fault */
-		} else {
-			/* MAP_PRIVATE|MAP_FILE read fault */
-		}
+	page_table = pte_offset_map_lock(mm, pmd, adress, &ptl);
+	if (likely(pte_same(*page_table, orig_pte))) {
+		flush_icache_page(vma, page);
+		if (flags & FAULT_FLAG_WRITE)
+			pte = pte_mkwrite(pte);
 	}
 }
