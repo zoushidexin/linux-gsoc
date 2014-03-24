@@ -115,9 +115,11 @@ EXPORT_SYMBOL_GPL(truncate_pagecache_hole);
  * and we can't treat it like a normal page without blowing things up... */
 int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long address, pmd_t *pmd, pgoff_t pgoff,
-		unsigned int flags, pte_t orig_pte, struct page *cow_page)
+		unsigned int flags, pte_t orig_pte, struct vm_fault *vmf,
+		struct page *cow_page)
 {
 	spinlock_t *ptl;
+	struct page *page_to_map = ZERO_PAGE(0);
 
 	/* These go somewhere... */
 	sb_start_pagefault(inode->i_sb);
@@ -126,11 +128,10 @@ int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (flags & FAULT_FLAG_WRITE) {
 		file_update_time(vma->vm_file);
 		if (vma->vm_flags & VM_SHARED) {
-			/* MAP_SHARED write fault */
+			cow_pagecache_hole(vma->vm_file->f_mapping, (address - vma->vm_start) / PAGE_SIZE, &page_to_map);
 		} else {
-			/* MAP_ANON write fault */
 			VM_BUG_ON(!cow_page);
-			copy_user_highpage(cow_page, ZERO_PAGE(0), address, vma);
+			copy_user_highpage(cow_page, page_to_map, address, vma);
 			__SetPageUptodate(cow_page);
 		}
 	}
@@ -140,5 +141,22 @@ int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		flush_icache_page(vma, page);
 		if (flags & FAULT_FLAG_WRITE)
 			pte = pte_mkwrite(pte);
+		if (!(vma->vm_flags & VM_SHARED)) {
+			inc_mm_counter_fast(mm, MM_ANONPAGES);
+			page_add_new_anon_rmap(page_to_map, vma, address);
+		} else {
+			inc_mm_counter_fast(mm, MM_FILEPAGES);
+			page_add_file_rmap(page_to_map);
+			if (flags & FAULT_FLAG_WRITE) {
+				get_page(page_to_map);
+			}
+		}
+		set_pte_at(mm, address, page_table, entry);
+		update_mmu_cache(vma, address, page_table);
+	} else {
+		BUG();
 	}
+
+	pte_unmap_unlock(page_table, ptl);
+	return 0;
 }
