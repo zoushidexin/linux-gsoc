@@ -49,7 +49,13 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
  **/
 void truncate_pagecache_hole(struct address_space *mapping, pgoff_t index);
 
+/* Obvious arguments are obvious */
+int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
+		unsigned long address, pmd_t *pmd, pgoff_t pgoff,
+		unsigned int flags, pte_t orig_pte, struct vm_fault *vmf,
+		struct page *cow_page);
+
 static inline int page_is_hole(struct page *p)
 {
-	return (unsigned long) p == PAGECACHE_HOLE_MAGIC;
+	return (unsigned long) p == (unsigned long) PAGECACHE_HOLE_MAGIC;
 }

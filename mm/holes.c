@@ -28,6 +28,7 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/cleancache.h>
+#include <linux/rmap.h>
 #include <linux/holes.h>
 
 static unsigned long num_cur_hole_pages = 0; /* Current number of non-backed holes */
@@ -56,7 +57,6 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
 {
 	void **slot;
 	struct page *slot_page, *new_page;
-	int r;
 
 	VM_BUG_ON(!page_is_hole(*page));
 
@@ -92,7 +92,6 @@ void cow_pagecache_hole(struct address_space *mapping, pgoff_t index, struct pag
 	spin_unlock_irq(&mapping->tree_lock);
 	rcu_read_unlock();
 
-out:
 	*page = new_page;
 }
 EXPORT_SYMBOL_GPL(cow_pagecache_hole);
@@ -101,8 +100,7 @@ void truncate_pagecache_hole(struct address_space *mapping, pgoff_t index)
 {
 	spin_lock_irq(&mapping->tree_lock);
 	radix_tree_delete(&mapping->page_tree, index);
-	mapping->nr_pages--;
-	__dec_zone_page_state(PAGECACHE_HOLE_MAGIC, NR_FILE_PAGES);
+	mapping->nrpages--;
 	spin_unlock_irq(&mapping->tree_lock);
 	num_cur_hole_pages--;
 
@@ -118,12 +116,13 @@ int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned int flags, pte_t orig_pte, struct vm_fault *vmf,
 		struct page *cow_page)
 {
+	pte_t *page_table, entry;
 	spinlock_t *ptl;
 	struct page *page_to_map = ZERO_PAGE(0);
 
 	/* These go somewhere... */
-	sb_start_pagefault(inode->i_sb);
-	sb_end_pagefault(inode->i_sb);
+//	sb_start_pagefault(inode->i_sb);
+//	sb_end_pagefault(inode->i_sb);
 
 	if (flags & FAULT_FLAG_WRITE) {
 		file_update_time(vma->vm_file);
@@ -136,16 +135,16 @@ int mmap_unbacked_hole_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		}
 	}
 
-	page_table = pte_offset_map_lock(mm, pmd, adress, &ptl);
+	page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
 	if (likely(pte_same(*page_table, orig_pte))) {
 		flush_icache_page(vma, page);
 		if (flags & FAULT_FLAG_WRITE)
-			pte = pte_mkwrite(pte);
+			entry = pte_mkwrite(entry);
 		if (!(vma->vm_flags & VM_SHARED)) {
-			inc_mm_counter_fast(mm, MM_ANONPAGES);
+			add_mm_counter(mm, MM_ANONPAGES, 1);
 			page_add_new_anon_rmap(page_to_map, vma, address);
 		} else {
-			inc_mm_counter_fast(mm, MM_FILEPAGES);
+			add_mm_counter(mm, MM_FILEPAGES, 1);
 			page_add_file_rmap(page_to_map);
 			if (flags & FAULT_FLAG_WRITE) {
 				get_page(page_to_map);

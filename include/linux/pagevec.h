@@ -28,7 +28,7 @@ unsigned pagevec_lookup_tag(struct pagevec *pvec,
 		struct address_space *mapping, pgoff_t *index, int tag,
 		unsigned nr_pages);
 
-static inline void pagevec_init(struct pagevec *pvec, int cold)
+static inline void pagevec_init(struct pagevec *pvec, long cold)
 {
 	pvec->nr = 0;
 	pvec->cold = test_bit(0, &cold);
@@ -52,7 +52,7 @@ static inline unsigned pagevec_space(struct pagevec *pvec)
 
 static inline unsigned pagevec_cold(struct pagevec *pvec)
 {
-	return test_bit(0, &pvec->cold)
+	return test_bit(0, &pvec->cold);
 }
 
 /* When truncating pages, we rely on page->index to remove the page from the

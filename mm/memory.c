@@ -60,6 +60,7 @@
 #include <linux/migrate.h>
 #include <linux/string.h>
 #include <linux/dma-debug.h>
+#include <linux/holes.h>
 
 #include <asm/io.h>
 #include <asm/pgalloc.h>

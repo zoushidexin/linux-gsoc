@@ -245,7 +245,7 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
-			if (unlikely(page_is_offset(&pvec->cold, i))) {
+			if (unlikely(page_is_offset(&pvec.cold, i))) {
 				truncate_pagecache_hole(mapping, (unsigned long) page);
 				continue;
 			}
@@ -328,7 +328,7 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
-			if (unlikely(page_is_offset(&pvec->cold, i))) {
+			if (unlikely(page_is_offset(&pvec.cold, i))) {
 				truncate_pagecache_hole(mapping, (unsigned long) page);
 				continue;
 			}
@@ -407,7 +407,7 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
-			if (unlikely(page_is_offset(&pvec->cold, i))) {
+			if (unlikely(page_is_offset(&pvec.cold, i))) {
 				truncate_pagecache_hole(mapping, (unsigned long) page);
 				continue;
 			}
@@ -513,7 +513,7 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
-			if (unlikely(page_is_offset(&pvec->cold, i))) {
+			if (unlikely(page_is_offset(&pvec.cold, i))) {
 				truncate_pagecache_hole(mapping, (unsigned long) page);
 				continue;
 			}

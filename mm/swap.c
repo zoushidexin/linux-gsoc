@@ -811,7 +811,7 @@ void lru_add_drain_all(void)
  * grabbed the page via the LRU.  If it did, give up: shrink_inactive_list()
  * will free it.
  */
-void release_pages(struct page **pages, int nr, int cold)
+void release_pages(struct page **pages, int nr, long cold)
 {
 	int i;
 	LIST_HEAD(pages_to_free);
